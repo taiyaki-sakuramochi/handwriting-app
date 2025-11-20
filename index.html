@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>手書きメモアプリ</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#007bff">
+    <link rel="apple-touch-icon" href="icon-512x512.png">
+    <style>
+        html, body {
+            height: 100%;
+            margin: 0;
+            font-family: -apple-system, BlinkMacMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f0f2f5;
+        }
+        body {
+            display: flex;
+            flex-direction: column;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        h1 {
+            color: #333;
+            margin-top: 0;
+            margin-bottom: 15px;
+            flex-shrink: 0;
+            text-align: center;
+        }
+        .app-container {
+            width: 100%;
+            max-width: 98%;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            min-height: 0;
+        }
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+            padding-bottom: 15px;
+            border-bottom: 1px solid #e0e0e0;
+            flex-shrink: 0;
+        }
+        .toolbar-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .toolbar-group label {
+            font-size: 14px;
+            color: #555;
+            white-space: nowrap;
+        }
+        .toolbar button, .action-btn {
+            padding: 8px 12px;
+            border: 1px solid #ccc;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background-color 0.2s, border-color 0.2s;
+        }
+        .toolbar button:hover, .action-btn:hover {
+            background-color: #e9e9e9;
+            border-color: #bbb;
+        }
+        .toolbar button.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        .toolbar button:disabled, .action-btn:disabled {
+            cursor: not-allowed;
+            opacity: 0.5;
+            background-color: #f9f9f9;
+        }
+        input[type="color"] {
+            width: 40px;
+            height: 40px;
+            border: none;
+            padding: 0;
+            border-radius: 50%;
+            cursor: pointer;
+            background-color: transparent;
+        }
+        .color-palette {
+            display: flex;
+            gap: 8px;
+        }
+        .palette-color {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid #fff;
+            box-shadow: 0 0 0 1px #ccc;
+            transition: transform 0.2s;
+        }
+        .palette-color:hover {
+            transform: scale(1.1);
+        }
+        input[type="range"] {
+            cursor: pointer;
+        }
+        .canvas-container {
+            flex-grow: 1;
+            position: relative;
+            min-height: 0;
+        }
+        #grid-canvas, #main-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        #main-canvas {
+            z-index: 1;
+            background-color: transparent;
+            cursor: crosshair;
+            touch-action: none;
+        }
+        #grid-canvas {
+            z-index: 0;
+            background-color: #fff;
+        }
+        .gallery {
+            margin-top: 20px;
+            flex-shrink: 0;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .gallery h2 {
+            color: #333;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+            margin-top: 0;
+        }
+        .gallery-content {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .memo-thumbnail {
+            position: relative;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #fff;
+            padding: 5px;
+        }
+        .memo-thumbnail img {
+            width: 100%;
+            height: auto;
+            border-radius: 2px;
+            cursor: pointer;
+        }
+        .memo-thumbnail:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        .delete-memo {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 24px;
+            height: 24px;
+            background: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 14px;
+            line-height: 24px;
+            text-align: center;
+            box-shadow: 0 0 4px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: opacity 0.2s, transform 0.2s;
+            transform: scale(0.8);
+        }
+        .memo-thumbnail:hover .delete-memo {
+            opacity: 1;
+            transform: scale(1);
+        }
+    @media (max-width: 768px) {
+            .toolbar {
+                gap: 10px;
+                justify-content: center;
+            }
+            .toolbar-group {
+                gap: 8px;
+            }
+            h1 {
+                font-size: 1.5rem;
+            }
+        }
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+            .app-container {
+                padding: 10px;
+            }
+            .toolbar-group label {
+                font-size: 12px;
+            }
+            .toolbar button, .action-btn {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>手書きメモアプリ</h1>
+
+    <div class="app-container">
+        <div class="toolbar">
+            <div class="toolbar-group">
+                <label>ツール:</label>
+                <button id="tool-pen" class="active">ペン</button>
+                <button id="tool-eraser">消しゴム</button>
+                <button id="tool-text">テキスト</button>
+            </div>
+            <div class="toolbar-group">
+                <label>図形:</label>
+                <button id="tool-line">直線</button>
+                <button id="tool-rect">四角形</button>
+                <button id="tool-circle">円</button>
+                <button id="tool-triangle">三角形</button>
+                <button id="tool-arrow">矢印</button>
+                <button id="tool-star">星形</button>
+            </div>
+             <div class="toolbar-group">
+                <input type="checkbox" id="fill-shape-toggle" style="cursor: pointer;">
+                <label for="fill-shape-toggle" style="cursor: pointer;">塗りつぶし</label>
+            </div>
+            <div class="toolbar-group">
+                <label for="color-picker">色:</label>
+                <div class="color-palette">
+                    <div class="palette-color" data-color="#000000" style="background-color: #000000;"></div>
+                    <div class="palette-color" data-color="#e63946" style="background-color: #e63946;"></div>
+                    <div class="palette-color" data-color="#2a9d8f" style="background-color: #2a9d8f;"></div>
+                    <div class="palette-color" data-color="#0077b6" style="background-color: #0077b6;"></div>
+                    <div class="palette-color" data-color="#ffbe0b" style="background-color: #ffbe0b;"></div>
+                    <div class="palette-color" data-color="#ffffff" style="background-color: #ffffff; border: 1px solid #eee"></div>
+                </div>
+                <input type="color" id="color-picker" value="#000000">
+            </div>
+            <div class="toolbar-group">
+                <label for="line-width">太さ:</label>
+                <input type="range" id="line-width" min="1" max="50" value="5">
+            </div>
+            <div class="toolbar-group">
+                <button id="grid-toggle" class="action-btn">方眼</button>
+            </div>
+            <div id="grid-controls" class="toolbar-group" style="display: none;">
+                <label for="grid-size">升目:</label>
+                <input type="range" id="grid-size" min="10" max="100" value="25">
+                <span id="grid-size-label">25px</span>
+            </div>
+            <div class="toolbar-group">
+                <button id="undo-btn" class="action-btn" disabled>戻る</button>
+                <button id="redo-btn" class="action-btn" disabled>進む</button>
+            </div>
+            <div class="toolbar-group">
+                <button id="clear-canvas" class="action-btn">全消し</button>
+                <button id="save-memo" class="action-btn">保存</button>
+            </div>
+        </div>
+
+        <div class="canvas-container">
+            <canvas id="grid-canvas"></canvas>
+            <canvas id="main-canvas"></canvas>
+        </div>
+
+        <div class="gallery">
+            <h2>保存したメモ</h2>
+            <div id="gallery-content" class="gallery-content">
+                <!-- Saved memos will be displayed here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const MEMO_STORAGE_KEY = 'handwrittenMemos';
+            
+            const canvas = document.getElementById('main-canvas');
+            const ctx = canvas.getContext('2d');
+            const gridCanvas = document.getElementById('grid-canvas');
+            const gridCtx = gridCanvas.getContext('2d');
+
+            const toolButtons = document.querySelectorAll('.toolbar button[id^="tool-"]');
+            const colorPicker = document.getElementById('color-picker');
+            const colorPalette = document.querySelectorAll('.palette-color');
+            const lineWidthRange = document.getElementById('line-width');
+            const clearButton = document.getElementById('clear-canvas');
+            const saveButton = document.getElementById('save-memo');
+            const galleryContent = document.getElementById('gallery-content');
+            const fillShapeToggle = document.getElementById('fill-shape-toggle');
+            
+            const gridToggleButton = document.getElementById('grid-toggle');
+            const gridControls = document.getElementById('grid-controls');
+            const gridSizeSlider = document.getElementById('grid-size');
+            const gridSizeLabel = document.getElementById('grid-size-label');
+
+            const undoBtn = document.getElementById('undo-btn');
+            const redoBtn = document.getElementById('redo-btn');
+
+            let currentTool = 'pen';
+            let isDrawing = false;
+            let lastX = 0;
+            let lastY = 0;
+            let startX = 0;
+            let startY = 0;
+            let snapshot = null;
+            let memos = [];
+            let historyStack = [];
+            let historyIndex = -1;
+
+            function setCanvasSize() {
+                const mainCanvasImage = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                
+                const newWidth = canvas.parentElement.clientWidth;
+                const newHeight = canvas.parentElement.clientHeight;
+
+                if (canvas.width !== newWidth || canvas.height !== newHeight) {
+                    canvas.width = newWidth;
+                    canvas.height = newHeight;
+                    gridCanvas.width = newWidth;
+                    gridCanvas.height = newHeight;
+                    
+                    ctx.putImageData(mainCanvasImage, 0, 0);
+                    ctx.lineCap = 'round';
+                    ctx.lineJoin = 'round';
+
+                    if (gridControls.style.display !== 'none') {
+                        drawGrid();
+                    }
+                }
+            }
+
+            function updateUndoRedoState() {
+                undoBtn.disabled = historyIndex <= 0;
+                redoBtn.disabled = historyIndex >= historyStack.length - 1;
+            }
+
+            function saveState(clearRedo = true) {
+                if (clearRedo && historyIndex < historyStack.length - 1) {
+                    historyStack = historyStack.slice(0, historyIndex + 1);
+                }
+                
+                if (historyStack.length > 30) {
+                    historyStack.shift();
+                    historyIndex--;
+                }
+
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                historyStack.push(imageData);
+                historyIndex = historyStack.length - 1;
+                updateUndoRedoState();
+            }
+
+            function undo() {
+                if (historyIndex > 0) {
+                    historyIndex--;
+                    ctx.putImageData(historyStack[historyIndex], 0, 0);
+                    updateUndoRedoState();
+                }
+            }
+
+            function redo() {
+                if (historyIndex < historyStack.length - 1) {
+                    historyIndex++;
+                    ctx.putImageData(historyStack[historyIndex], 0, 0);
+                    updateUndoRedoState();
+                }
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                const pos = getMousePos(e);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                if (currentTool === 'pen' || currentTool === 'eraser') {
+                    ctx.strokeStyle = colorPicker.value;
+                    ctx.lineWidth = lineWidthRange.value;
+                    ctx.beginPath();
+                    ctx.moveTo(lastX, lastY);
+                    ctx.lineTo(pos.x, pos.y);
+                    ctx.stroke();
+                    [lastX, lastY] = [pos.x, pos.y];
+                }
+            }
+            
+            function getMousePos(e) {
+                const rect = canvas.getBoundingClientRect();
+                const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+                const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+                return { x: clientX - rect.left, y: clientY - rect.top };
+            }
+
+            function handleTextToolClick(e) {
+                isDrawing = false;
+                const existingInput = document.querySelector('.text-input-overlay');
+                if (existingInput) existingInput.blur();
+
+                const canvasContainer = document.querySelector('.canvas-container');
+                const pos = getMousePos(e);
+                const textarea = document.createElement('textarea');
+                textarea.className = 'text-input-overlay';
+                textarea.style.position = 'absolute';
+                textarea.style.left = `${pos.x}px`;
+                textarea.style.top = `${pos.y}px`;
+                textarea.style.border = '1px dashed #007bff';
+                textarea.style.outline = 'none';
+                textarea.style.padding = '4px';
+                const fontSize = Math.max(12, lineWidthRange.value);
+                textarea.style.fontSize = `${fontSize}px`;
+                textarea.style.lineHeight = '1.2';
+                textarea.style.fontFamily = 'sans-serif';
+                textarea.style.color = colorPicker.value;
+                textarea.style.background = 'rgba(255, 255, 255, 0.95)';
+                textarea.style.zIndex = '101';
+                textarea.style.minWidth = '50px';
+                textarea.style.resize = 'none';
+                textarea.style.overflow = 'hidden';
+                textarea.wrap = 'off';
+                canvasContainer.appendChild(textarea);
+                setTimeout(() => textarea.focus(), 0);
+
+                const drawTextAndRemove = () => {
+                    const text = textarea.value;
+                    if (text && canvasContainer.contains(textarea)) {
+                        ctx.fillStyle = textarea.style.color;
+                        ctx.font = `${textarea.style.fontSize} sans-serif`;
+                        ctx.textBaseline = 'top';
+                        const x = parseInt(textarea.style.left, 10);
+                        const y = parseInt(textarea.style.top, 10);
+                        const lineHeight = fontSize * 1.2;
+                        text.split('\n').forEach((line, index) => {
+                            ctx.fillText(line, x, y + (index * lineHeight));
+                        });
+                        saveState();
+                    }
+                    if (canvasContainer.contains(textarea)) canvasContainer.removeChild(textarea);
+                    textarea.removeEventListener('blur', drawTextAndRemove);
+                    textarea.removeEventListener('keydown', onKeyDown);
+                };
+
+                const onKeyDown = (e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); textarea.blur(); } 
+                    else if (e.key === 'Escape') { textarea.value = ''; textarea.blur(); }
+                    setTimeout(() => {
+                        textarea.style.height = 'auto';
+                        textarea.style.width = 'auto';
+                        textarea.style.height = `${textarea.scrollHeight}px`;
+                        textarea.style.width = `${textarea.scrollWidth}px`;
+                    }, 0);
+                };
+
+                textarea.addEventListener('blur', drawTextAndRemove);
+                textarea.addEventListener('keydown', onKeyDown);
+                setTimeout(() => {
+                    textarea.style.height = 'auto';
+                    textarea.style.width = 'auto';
+                    textarea.style.height = `${textarea.scrollHeight}px`;
+                    textarea.style.width = `${textarea.scrollWidth}px`;
+                }, 0);
+            }
+
+            function startDrawing(e) {
+                if (currentTool === 'text') { handleTextToolClick(e); return; }
+                isDrawing = true;
+                const pos = getMousePos(e);
+                [lastX, lastY] = [pos.x, pos.y];
+                [startX, startY] = [pos.x, pos.y];
+                ctx.save();
+                snapshot = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            }
+
+            function stopDrawing(e) {
+                if (!isDrawing) return;
+                isDrawing = false;
+                if (['line', 'rect', 'circle', 'triangle', 'arrow', 'star', 'pen', 'eraser'].includes(currentTool)) {
+                    if (['line', 'rect', 'circle', 'triangle', 'arrow', 'star'].includes(currentTool)) {
+                        handleToolUpdate(e);
+                    }
+                    saveState();
+                }
+                ctx.restore();
+                ctx.beginPath();
+            }
+            
+            function handleToolUpdate(e) {
+                const pos = getMousePos(e);
+                if (!isDrawing) return;
+                ctx.putImageData(snapshot, 0, 0);
+                ctx.strokeStyle = colorPicker.value;
+                ctx.fillStyle = colorPicker.value;
+                ctx.lineWidth = lineWidthRange.value;
+                const doFill = fillShapeToggle.checked;
+                if (currentTool === 'line') {
+                    ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(pos.x, pos.y); ctx.stroke();
+                } else if (currentTool === 'rect') {
+                    ctx.beginPath(); ctx.rect(startX, startY, pos.x - startX, pos.y - startY); if(doFill) ctx.fill(); ctx.stroke();
+                } else if (currentTool === 'circle') {
+                    ctx.beginPath(); const radius = Math.sqrt(Math.pow(pos.x - startX, 2) + Math.pow(pos.y - startY, 2)); ctx.arc(startX, startY, radius, 0, 2 * Math.PI); if(doFill) ctx.fill(); ctx.stroke();
+                } else if (currentTool === 'triangle') {
+                    ctx.beginPath(); ctx.moveTo(startX, startY); ctx.lineTo(pos.x, pos.y); ctx.lineTo(startX - (pos.x - startX), pos.y); ctx.closePath(); if(doFill) ctx.fill(); ctx.stroke();
+                } else if (currentTool === 'arrow') {
+                    drawArrow(startX, startY, pos.x, pos.y);
+                } else if (currentTool === 'star') {
+                    drawStar(startX, startY, pos.x, pos.y, doFill);
+                }
+            }
+
+            function drawArrow(fromX, fromY, toX, toY) {
+                const headlen = ctx.lineWidth * 5; const dx = toX - fromX; const dy = toY - fromY; const angle = Math.atan2(dy, dx);
+                ctx.beginPath(); ctx.moveTo(fromX, fromY); ctx.lineTo(toX, toY); ctx.lineTo(toX - headlen * Math.cos(angle - Math.PI / 6), toY - headlen * Math.sin(angle - Math.PI / 6));
+                ctx.moveTo(toX, toY); ctx.lineTo(toX - headlen * Math.cos(angle + Math.PI / 6), toY - headlen * Math.sin(angle + Math.PI / 6)); ctx.stroke();
+            }
+
+            function drawStar(centerX, centerY, endX, endY, doFill) {
+                const radius = Math.sqrt(Math.pow(endX - centerX, 2) + Math.pow(endY - centerY, 2)); const spikes = 5; const outerRadius = radius; const innerRadius = radius / 2;
+                let rot = Math.PI / 2 * 3; let x = centerX; let y = centerY; const step = Math.PI / spikes;
+                ctx.beginPath(); ctx.moveTo(centerX, centerY - outerRadius);
+                for (let i = 0; i < spikes; i++) {
+                    x = centerX + Math.cos(rot) * outerRadius; y = centerY + Math.sin(rot) * outerRadius; ctx.lineTo(x, y); rot += step;
+                    x = centerX + Math.cos(rot) * innerRadius; y = centerY + Math.sin(rot) * innerRadius; ctx.lineTo(x, y); rot += step;
+                }
+                ctx.lineTo(centerX, centerY - outerRadius); ctx.closePath(); if(doFill) ctx.fill(); ctx.stroke();
+            }
+
+            function drawGrid() {
+                const size = gridSizeSlider.value;
+                gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+                gridCtx.beginPath();
+                gridCtx.strokeStyle = '#e0e0e0';
+                gridCtx.lineWidth = 1;
+                for (let x = 0; x < gridCanvas.width; x += Number(size)) {
+                    gridCtx.moveTo(x, 0); gridCtx.lineTo(x, gridCanvas.height);
+                }
+                for (let y = 0; y < gridCanvas.height; y += Number(size)) {
+                    gridCtx.moveTo(0, y); gridCtx.lineTo(gridCanvas.width, y);
+                }
+                gridCtx.stroke();
+            }
+
+            function toggleGrid() {
+                const isGridVisible = gridControls.style.display !== 'none';
+                if (isGridVisible) {
+                    gridControls.style.display = 'none';
+                    gridToggleButton.classList.remove('active');
+                    gridCtx.clearRect(0, 0, gridCanvas.width, gridCanvas.height);
+                } else {
+                    gridControls.style.display = 'flex';
+                    gridToggleButton.classList.add('active');
+                    drawGrid();
+                }
+            }
+
+            function saveMemo() {
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = canvas.width;
+                tempCanvas.height = canvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+                tempCtx.drawImage(gridCanvas, 0, 0);
+                tempCtx.drawImage(canvas, 0, 0);
+                const dataUrl = tempCanvas.toDataURL('image/png');
+                memos.push(dataUrl);
+                localStorage.setItem(MEMO_STORAGE_KEY, JSON.stringify(memos));
+                renderGallery();
+                alert('メモを保存しました！');
+            }
+
+            function renderGallery() {
+                galleryContent.innerHTML = '';
+                memos.forEach((dataUrl, index) => {
+                    const thumbContainer = document.createElement('div');
+                    thumbContainer.classList.add('memo-thumbnail');
+                    const img = document.createElement('img');
+                    img.src = dataUrl;
+                    img.addEventListener('click', () => loadMemoToCanvas(index));
+                    const deleteBtn = document.createElement('button');
+                    deleteBtn.classList.add('delete-memo');
+                    deleteBtn.innerHTML = '&times;';
+                    deleteBtn.addEventListener('click', (e) => { e.stopPropagation(); deleteMemo(index); });
+                    thumbContainer.appendChild(img);
+                    thumbContainer.appendChild(deleteBtn);
+                    galleryContent.appendChild(thumbContainer);
+                });
+            }
+
+            function loadMemoToCanvas(index) {
+                const dataUrl = memos[index];
+                const img = new Image();
+                img.onload = () => {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    ctx.drawImage(img, 0, 0);
+                    saveState();
+                };
+                img.src = dataUrl;
+            }
+
+            function deleteMemo(index) {
+                if (confirm('このメモを削除しますか？')) {
+                    memos.splice(index, 1);
+                    localStorage.setItem(MEMO_STORAGE_KEY, JSON.stringify(memos));
+                    renderGallery();
+                }
+            }
+
+            function loadMemos() {
+                const savedMemos = localStorage.getItem(MEMO_STORAGE_KEY);
+                if (savedMemos) {
+                    memos = JSON.parse(savedMemos);
+                }
+                renderGallery();
+            }
+
+            canvas.addEventListener('mousedown', startDrawing);
+            canvas.addEventListener('mouseup', stopDrawing);
+            canvas.addEventListener('mouseout', (e) => { if (isDrawing) stopDrawing(e); });
+            canvas.addEventListener('mousemove', (e) => {
+                if (!isDrawing) return;
+                if (['pen', 'eraser'].includes(currentTool)) { draw(e); } else { handleToolUpdate(e); }
+            });
+            canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e.touches[0]); }, { passive: false });
+            canvas.addEventListener('touchend', (e) => { e.preventDefault(); stopDrawing(e.changedTouches[0]); }, { passive: false });
+            canvas.addEventListener('touchmove', (e) => { e.preventDefault(); if(isDrawing) { if (['pen', 'eraser'].includes(currentTool)) { draw(e.touches[0]); } else { handleToolUpdate(e.touches[0]); }}}, { passive: false });
+
+            toolButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const existingInput = document.querySelector('.text-input-overlay');
+                    if (existingInput) existingInput.blur();
+                    
+                    document.querySelectorAll('.toolbar button[id^="tool-"]').forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    currentTool = button.id.replace('tool-', '');
+
+                    if (currentTool === 'eraser') {
+                        ctx.globalCompositeOperation = 'destination-out';
+                    } else {
+                        ctx.globalCompositeOperation = 'source-over';
+                    }
+
+                    if (currentTool === 'text') {
+                        canvas.style.cursor = 'text';
+                    } else {
+                        canvas.style.cursor = 'crosshair';
+                    }
+                });
+            });
+
+            colorPalette.forEach(color => {
+                color.addEventListener('click', (e) => {
+                    colorPicker.value = e.target.dataset.color;
+                });
+            });
+
+            clearButton.addEventListener('click', () => {
+                if (confirm('キャンバスを本当にクリアしますか？')) {
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    saveState();
+                }
+            });
+
+            saveButton.addEventListener('click', saveMemo);
+            gridToggleButton.addEventListener('click', toggleGrid);
+            gridSizeSlider.addEventListener('input', () => {
+                gridSizeLabel.textContent = `${gridSizeSlider.value}px`;
+                drawGrid();
+            });
+            undoBtn.addEventListener('click', undo);
+            redoBtn.addEventListener('click', redo);
+
+            setTimeout(() => {
+                setCanvasSize();
+                saveState();
+            }, 100);
+            loadMemos();
+            window.addEventListener('resize', setCanvasSize);
+        });
+    </script>
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(registration => {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, err => {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+    </script>
+</body>
+</html>
